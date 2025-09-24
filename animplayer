@@ -1,0 +1,178 @@
+-- Roblox Animation Executor (Play / Stop / Close + Custom Input)
+-- Modern draggable GUI for animations with play/stop and custom ID input
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+
+local function normalizeId(text)
+    if not text then return nil end
+    local id = tostring(text)
+    id = id:match("%d+") or id
+    return id and tonumber(id) and ("rbxassetid://"..tostring(id)) or nil
+end
+
+-- GUI setup
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "AnimExecutorGUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local main = Instance.new("Frame")
+main.Size = UDim2.new(0, 350, 0, 150)
+main.Position = UDim2.new(0.7, -175, 0.1, 0)
+main.BackgroundColor3 = Color3.fromRGB(25,25,30)
+main.BorderSizePixel = 0
+main.Parent = screenGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 10)
+corner.Parent = main
+
+-- Title
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 32)
+titleBar.BackgroundTransparency = 1
+titleBar.Parent = main
+
+local title = Instance.new("TextLabel")
+title.Text = "Animasyon Çalıştırıcı"
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+title.TextColor3 = Color3.fromRGB(240,240,240)
+title.BackgroundTransparency = 1
+title.Size = UDim2.new(1, -40, 1, 0)
+title.Position = UDim2.new(0, 10, 0, 0)
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = titleBar
+
+local closeBtn = Instance.new("TextButton")
+closeBtn.Text = "X"
+closeBtn.Size = UDim2.new(0, 28, 0, 28)
+closeBtn.Position = UDim2.new(1, -32, 0.5, -14)
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 14
+closeBtn.TextColor3 = Color3.fromRGB(255,255,255)
+closeBtn.BackgroundColor3 = Color3.fromRGB(60,60,70)
+closeBtn.Parent = titleBar
+
+local closeCorner = Instance.new("UICorner")
+closeCorner.CornerRadius = UDim.new(0,6)
+closeCorner.Parent = closeBtn
+
+closeBtn.MouseButton1Click:Connect(function()
+    screenGui:Destroy()
+end)
+
+-- Dragging support
+local dragging = false
+local dragInput, dragStart, startPos
+
+titleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = main.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+titleBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- Animator
+local animator
+local function getAnimator()
+    character = player.Character or player.CharacterAdded:Wait()
+    local humanoid = character:WaitForChild("Humanoid")
+    animator = humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator", humanoid)
+    return animator
+end
+
+local currentTrack
+local function playAnim(animId)
+    if currentTrack then currentTrack:Stop(0.3) end
+    local anim = Instance.new("Animation")
+    anim.AnimationId = animId
+    local track = getAnimator():LoadAnimation(anim)
+    track.Looped = true
+    track:Play(0.3, 1, 1)
+    currentTrack = track
+end
+
+local function stopAnim()
+    if currentTrack then
+        currentTrack:Stop(0.3)
+        currentTrack = nil
+    end
+end
+
+-- Input + buttons
+local inputBox = Instance.new("TextBox")
+inputBox.Size = UDim2.new(1, -20, 0, 30)
+inputBox.Position = UDim2.new(0, 10, 0, 40)
+inputBox.PlaceholderText = "Animasyon ID gir"
+inputBox.Font = Enum.Font.Gotham
+inputBox.TextColor3 = Color3.fromRGB(255,255,255)
+inputBox.BackgroundColor3 = Color3.fromRGB(50,50,55)
+inputBox.ClearTextOnFocus = false
+inputBox.Parent = main
+
+local cornerInput = Instance.new("UICorner")
+cornerInput.CornerRadius = UDim.new(0,6)
+cornerInput.Parent = inputBox
+
+-- Play button
+local playBtn = Instance.new("TextButton")
+playBtn.Size = UDim2.new(0.5, -15, 0, 30)
+playBtn.Position = UDim2.new(0, 10, 0, 80)
+playBtn.Text = "Başlat"
+playBtn.Font = Enum.Font.GothamBold
+playBtn.TextColor3 = Color3.fromRGB(255,255,255)
+playBtn.BackgroundColor3 = Color3.fromRGB(60,60,70)
+playBtn.Parent = main
+
+local playCorner = Instance.new("UICorner")
+playCorner.CornerRadius = UDim.new(0,6)
+playCorner.Parent = playBtn
+
+playBtn.MouseButton1Click:Connect(function()
+    local id = normalizeId(inputBox.Text)
+    if id then
+        playAnim(id)
+    end
+end)
+
+-- Stop button
+local stopBtn = Instance.new("TextButton")
+stopBtn.Size = UDim2.new(0.5, -15, 0, 30)
+stopBtn.Position = UDim2.new(0.5, 5, 0, 80)
+stopBtn.Text = "Durdur"
+stopBtn.Font = Enum.Font.GothamBold
+stopBtn.TextColor3 = Color3.fromRGB(255,255,255)
+stopBtn.BackgroundColor3 = Color3.fromRGB(60,60,70)
+stopBtn.Parent = main
+
+local stopCorner = Instance.new("UICorner")
+stopCorner.CornerRadius = UDim.new(0,6)
+stopCorner.Parent = stopBtn
+
+stopBtn.MouseButton1Click:Connect(function()
+    stopAnim()
+end)
